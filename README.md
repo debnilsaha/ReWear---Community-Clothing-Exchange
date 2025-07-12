@@ -41,17 +41,12 @@ ReWear is a web‑based platform built from scratch during a hackathon to empowe
    * Real‑time chat integrated via WebSockets for negotiation.
    * Request tracking dashboard to manage incoming and outgoing requests.
 
-4. **Geolocation & Mapping**
-
-   * Interactive map view showing nearby items.
-   * Location filtering for quick finds in your neighborhood.
-
-5. **Admin Dashboard**
+4. **Admin Dashboard**
 
    * Monitor user activity and listings.
    * Approve or flag inappropriate content.
 
-6. **Responsive Design**
+5. **Responsive Design**
 
    * Mobile‑first approach with Tailwind CSS.
    * Cross‑browser compatibility.
@@ -65,10 +60,6 @@ ReWear is a web‑based platform built from scratch during a hackathon to empowe
 | **Frontend**           | React.js, Tailwind CSS, React Router |
 | **Backend**            | Node.js, Express.js, MongoDB         |
 | **Authentication**     | JSON Web Tokens (JWT), bcrypt.js     |
-| **Real‑Time Chat**     | Socket.io                            |
-| **Hosting / CI‑CD**    | Vercel (Frontend), Heroku (Backend)  |
-| **Maps & Geolocation** | Leaflet.js, OpenStreetMap            |
-| **Image Storage**      | Cloudinary                           |
 
 ---
 
@@ -110,7 +101,7 @@ ReWear is a web‑based platform built from scratch during a hackathon to empowe
 
 * **Create account**: Sign up with email or OAuth.
 * **List items**: Add clothing with photos and details.
-* **Search & filter**: Find items by size, category, or location.
+* **Search & filter**: Find items by size, category etc.
 * **Request exchange**: Choose swap, borrow, or donate workflows.
 * **Chat**: Negotiate with other users in real time.
 
