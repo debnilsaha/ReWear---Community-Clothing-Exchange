@@ -7,6 +7,9 @@ Team Details:
 2. Keyur Sonawane - Keyur.ce22@sot.pdpu.ac.in
 3. Parth Pathak - parth.pee22@sot.pdpu.ac.in 
 
+Demonstration Video Link:-
+https://drive.google.com/file/d/1Y6_q_MXlzYwUZH3A3_K0eFB3L98qYgmP/view?usp=drive_link
+
 **ReWear – Community Clothing Exchange**
 
 **About the Project**
