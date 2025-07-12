@@ -103,7 +103,7 @@ ReWear is a web‑based platform built from scratch during a hackathon to empowe
 * **List items**: Add clothing with photos and details.
 * **Search & filter**: Find items by size, category etc.
 * **Request exchange**: Choose swap, borrow, or donate workflows.
-* **Chat**: Negotiate with other users in real time.
+* **Chat**: Negotiate with other users in real time.(Can be addedin future)
 
 ---
 
@@ -125,4 +125,4 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ---
 
-> Built with ❤️ in a hackathon environment. Let’s make fashion sustainable, one swap at a time!
+> Built with ❤️ in Odoo hackathon environment. Let’s make fashion sustainable, one swap at a time!
