@@ -6,6 +6,7 @@ export default function Landing() {
     <Container className="py-5">
       <Row className="justify-content-center mb-4">
         <Col md={8} className="text-center">
+          <img src="raw.png" alt="ReWear Logo" style={{ maxWidth: 180, marginBottom: 24 }} />
           <h1 className="display-4 fw-bold text-success mb-3">
             Welcome to ReWear
           </h1>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from '../api/axios';
-import { Container, Row, Col, Form, Button, Card } from 'react-bootstrap';
+import { Container, Row, Col, Form, Button, Card, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
 export default function Browse() {
@@ -12,6 +12,19 @@ export default function Browse() {
     condition: '',
     tags: ''
   });
+  const [user, setUser] = useState(null);
+  const [message, setMessage] = useState('');
+  const [loadingId, setLoadingId] = useState(null);
+
+  useEffect(() => {
+    // Fetch user profile if logged in
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.get('/auth/profile', { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setUser(res.data))
+        .catch(() => setUser(null));
+    }
+  }, []);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -21,6 +34,7 @@ export default function Browse() {
       });
 
       const res = await axios.get('/items', { params });
+      console.log('Browse items response:', res.data); // Debug log
       setItems(res.data);
     } catch (e) {
       console.error(e);
@@ -50,9 +64,54 @@ export default function Browse() {
     fetchItems();
   };
 
+  // Swap Request handler
+  const handleSwapRequest = async (itemId) => {
+    setLoadingId(itemId);
+    setMessage('');
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setMessage('Please log in to request a swap.');
+      setLoadingId(null);
+      return;
+    }
+    try {
+      await axios.post(`/items/${itemId}/swap-request`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage('Swap request sent!');
+      fetchItems();
+    } catch (e) {
+      setMessage(e.response?.data?.msg || 'Error sending swap request.');
+    }
+    setLoadingId(null);
+  };
+
+  // Redeem via Points handler
+  const handleRedeem = async (itemId) => {
+    setLoadingId(itemId);
+    setMessage('');
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setMessage('Please log in to redeem items.');
+      setLoadingId(null);
+      return;
+    }
+    try {
+      await axios.post(`/items/${itemId}/redeem`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage('Item redeemed via points!');
+      fetchItems();
+    } catch (e) {
+      setMessage(e.response?.data?.msg || 'Error redeeming item.');
+    }
+    setLoadingId(null);
+  };
+
   return (
     <Container className="mt-5">
       <h2>Browse Items</h2>
+      {message && <Alert variant="info">{message}</Alert>}
 
       {/* Filters */}
       <Row className="mb-4">
@@ -126,29 +185,59 @@ export default function Browse() {
       {/* Items Grid */}
       <Row>
         {items.length === 0 && <p>No items found.</p>}
-        {items.map(item => (
-          <Col md={4} key={item._id} className="mb-4">
-            <Card>
-              <Card.Img
-                variant="top"
-                src={`http://localhost:8080/${item.images[0]}`}
-                height="200"
-                style={{ objectFit: 'cover' }}
-              />
-              <Card.Body>
-                <Card.Title>{item.title}</Card.Title>
-                <Card.Text>{item.description}</Card.Text>
-                <Button
-                  as={Link}
-                  to={`/item/${item._id}`}
-                  variant="primary"
-                >
-                  View Details
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
-        ))}
+        {items.map(item => {
+          const isUploader = user && item.uploader && item.uploader._id === user._id;
+          const isAvailable = item.status === 'available';
+          return (
+            <Col md={4} key={item._id} className="mb-4">
+              <Card>
+                <Card.Img
+                  variant="top"
+                  src={`http://localhost:8080/${item.images[0]}`}
+                  height="200"
+                  style={{ objectFit: 'cover' }}
+                />
+                <Card.Body>
+                  <Card.Title>{item.title}</Card.Title>
+                  <Card.Text>
+                    Redeem for: <strong>15 points</strong><br />
+                    Estimated value: <strong>10–15 points</strong>
+                  </Card.Text>
+                  <div className="mb-2">
+                    <span>Status: {item.status.charAt(0).toUpperCase() + item.status.slice(1)}</span>
+                  </div>
+                  <Button
+                    as={Link}
+                    to={`/item/${item._id}`}
+                    variant="primary"
+                    className="me-2"
+                  >
+                    View Details
+                  </Button>
+                  {!isUploader && isAvailable && (
+                    <>
+                      <Button
+                        variant="success"
+                        className="me-2"
+                        disabled={loadingId === item._id}
+                        onClick={() => handleSwapRequest(item._id)}
+                      >
+                        {loadingId === item._id ? 'Requesting...' : 'Swap Request'}
+                      </Button>
+                      <Button
+                        variant="warning"
+                        disabled={loadingId === item._id}
+                        onClick={() => handleRedeem(item._id)}
+                      >
+                        {loadingId === item._id ? 'Processing...' : 'Redeem via Points'}
+                      </Button>
+                    </>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          );
+        })}
       </Row>
     </Container>
   );

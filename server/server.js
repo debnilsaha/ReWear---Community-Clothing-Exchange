@@ -22,7 +22,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/swaps', swapRoutes);
 
 mongoose
-  .connect('mongodb://localhost:27017/rewear', {
+  .connect('mongodb+srv://keyurkns2004:keyur7604@cluster0.hln29kt.mongodb.net/', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })

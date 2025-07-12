@@ -31,13 +31,14 @@ router.get('/mine', authMiddleware, async (req, res) => {
   }
 });
 
-// Add new item
+// Add new item (set approved: true)
 router.post('/', authMiddleware, upload.array('images'), async (req, res) => {
   try {
     const item = new Item({
       ...req.body,
       images: req.files.map((f) => f.path),
       uploader: req.user.id,
+      approved: true,
     });
     await item.save();
     res.json(item);
@@ -46,17 +47,15 @@ router.post('/', authMiddleware, upload.array('images'), async (req, res) => {
   }
 });
 
-// Get all items with filters
+// Get all items with filters (only approved)
 router.get('/', async (req, res) => {
   try {
-    const query = {};
-
+    const query = { approved: true };
     if (req.query.category) query.category = req.query.category;
     if (req.query.size) query.size = req.query.size;
     if (req.query.type) query.type = req.query.type;
     if (req.query.condition) query.condition = req.query.condition;
     if (req.query.tags) query.tags = { $in: req.query.tags.split(',') };
-
     const items = await Item.find(query).populate('uploader', 'name');
     res.json(items);
   } catch (e) {
@@ -75,56 +74,78 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Swap Request: user requests to swap for an item
+// Admin: Approve item
+router.post('/:id/approve', authMiddleware, async (req, res) => {
+  // Only allow admin
+  if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Forbidden' });
+  try {
+    const item = await Item.findByIdAndUpdate(req.params.id, { approved: true }, { new: true });
+    if (!item) return res.status(404).json({ msg: 'Item not found' });
+    // Award 10 points to uploader
+    await User.findByIdAndUpdate(item.uploader, { $inc: { points: 10 } });
+    res.json({ msg: 'Item approved', item });
+  } catch (e) {
+    res.status(500).json({ msg: e.message });
+  }
+});
+
+// Admin: Reject item
+router.post('/:id/reject', authMiddleware, async (req, res) => {
+  // Only allow admin
+  if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Forbidden' });
+  try {
+    const item = await Item.findByIdAndDelete(req.params.id);
+    if (!item) return res.status(404).json({ msg: 'Item not found' });
+    res.json({ msg: 'Item rejected and deleted' });
+  } catch (e) {
+    res.status(500).json({ msg: e.message });
+  }
+});
+
+// Swap Request: user requests to swap for an item (multiple requests supported)
 router.post('/:id/swap-request', authMiddleware, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ msg: 'Item not found' });
-
     if (item.status !== 'available')
       return res.status(400).json({ msg: 'Item not available for swap' });
-
     if (item.uploader.toString() === req.user.id)
       return res.status(400).json({ msg: 'Cannot swap your own item' });
-
-    if (item.swapRequest && item.swapRequest.status === 'pending')
-      return res.status(400).json({ msg: 'Swap request already pending' });
-
-    item.swapRequest = {
-      requester: req.user.id,
-      status: 'pending'
-    };
+    // Check if user already has a pending request
+    if (item.swapRequests.some(r => r.requester.toString() === req.user.id && r.status === 'pending'))
+      return res.status(400).json({ msg: 'You already have a pending swap request for this item' });
+    item.swapRequests.push({ requester: req.user.id, status: 'pending' });
     await item.save();
-
-    // In real app, notify uploader here (e.g., email, notification system)
-
     res.json({ msg: 'Swap request sent' });
   } catch (e) {
     res.status(500).json({ msg: e.message });
   }
 });
 
-// Uploader approves or rejects swap request
+// Uploader approves or rejects swap request (by requester id)
 router.post('/:id/swap-response', authMiddleware, async (req, res) => {
-  // expects { action: 'approve' | 'reject' }
-  const { action } = req.body;
+  // expects { requesterId, action: 'approve' | 'reject' }
+  const { requesterId, action } = req.body;
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ msg: 'Item not found' });
-
     if (item.uploader.toString() !== req.user.id)
       return res.status(403).json({ msg: 'Only uploader can respond' });
-
-    if (!item.swapRequest || item.swapRequest.status !== 'pending')
-      return res.status(400).json({ msg: 'No pending swap request' });
-
+    const swapReq = item.swapRequests.find(r => r.requester.toString() === requesterId && r.status === 'pending');
+    if (!swapReq) return res.status(400).json({ msg: 'No pending swap request from this user' });
     if (action === 'approve') {
       item.status = 'swapped';
-      item.swapRequest.status = 'approved';
+      swapReq.status = 'approved';
+      // Add to history
+      item.history.push({ user: requesterId, action: 'swapped' });
+      // Add to user swap history
+      const User = require('../Models/User');
+      await User.findByIdAndUpdate(requesterId, { $push: { swappedItems: item._id }, $inc: { points: 5 } });
+      await User.findByIdAndUpdate(item.uploader, { $push: { swappedItems: item._id }, $inc: { points: 5 } });
       await item.save();
       res.json({ msg: 'Swap approved' });
     } else if (action === 'reject') {
-      item.swapRequest.status = 'rejected';
+      swapReq.status = 'rejected';
       await item.save();
       res.json({ msg: 'Swap rejected' });
     } else {
@@ -140,30 +161,29 @@ router.post('/:id/redeem', authMiddleware, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id).populate('uploader');
     if (!item) return res.status(404).json({ msg: 'Item not found' });
-
     if (item.status !== 'available')
       return res.status(400).json({ msg: 'Item not available for redemption' });
-
     if (item.uploader._id.toString() === req.user.id)
       return res.status(400).json({ msg: 'Cannot redeem your own item' });
-
-    // Define point cost for redemption, e.g. 10 points
-    const redemptionCost = 10;
-
+    const redemptionCost = 15;
+    const User = require('../Models/User');
     const user = await User.findById(req.user.id);
     if (user.points < redemptionCost)
       return res.status(400).json({ msg: 'Not enough points to redeem' });
-
     // Deduct points from user and add to uploader
     user.points -= redemptionCost;
     await user.save();
-
     item.uploader.points += redemptionCost;
     await item.uploader.save();
-
     item.status = 'redeemed';
+    // Reserve for redeemer
+    item.reservedFor = req.user.id;
+    // Add to history
+    item.history.push({ user: req.user.id, action: 'redeemed' });
+    // Add to user redeem history
+    user.redeemedItems.push(item._id);
+    await user.save();
     await item.save();
-
     res.json({ msg: 'Item redeemed via points' });
   } catch (e) {
     res.status(500).json({ msg: e.message });

@@ -51,7 +51,7 @@ export default function Register() {
                   <Form.Control
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="John Doe"
+                    placeholder=""
                   />
                 </Form.Group>
                 <Form.Group className="mb-3">
@@ -60,7 +60,7 @@ export default function Register() {
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder=""
                   />
                 </Form.Group>
                 <Form.Group className="mb-4">

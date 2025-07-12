@@ -51,7 +51,7 @@ export default function Login() {
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder=""
                   />
                 </Form.Group>
                 <Form.Group className="mb-4">
@@ -60,7 +60,7 @@ export default function Login() {
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder=""
                   />
                 </Form.Group>
                 <div className="d-grid">

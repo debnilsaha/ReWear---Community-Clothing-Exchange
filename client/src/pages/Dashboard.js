@@ -15,10 +15,13 @@ import { Link } from 'react-router-dom';
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [userItems, setUserItems] = useState([]);
-  const [ongoingSwaps, setOngoingSwaps] = useState([]);
-  const [completedSwaps, setCompletedSwaps] = useState([]);
+  const [swappedItems, setSwappedItems] = useState([]);
+  const [redeemedItems, setRedeemedItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [swapRequests, setSwapRequests] = useState([]);
+  const [swapMessage, setSwapMessage] = useState('');
+  const [mySwapRequests, setMySwapRequests] = useState([]);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -29,9 +32,7 @@ export default function Dashboard() {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
         });
-
         setUser(profileRes.data);
-
         // get user's own items
         const itemsRes = await axios.get('/items/mine', {
           headers: {
@@ -39,29 +40,83 @@ export default function Dashboard() {
           },
         });
         setUserItems(itemsRes.data);
-
-        // get swap data
-        const swapsRes = await axios.get('/swaps/mine', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
+        // get swapped and redeemed items (populate from user profile)
+        const swapped = [];
+        const redeemed = [];
+        if (profileRes.data.swappedItems && profileRes.data.swappedItems.length > 0) {
+          for (let itemId of profileRes.data.swappedItems) {
+            const res = await axios.get(`/items/${itemId}`);
+            swapped.push(res.data);
+          }
+        }
+        if (profileRes.data.redeemedItems && profileRes.data.redeemedItems.length > 0) {
+          for (let itemId of profileRes.data.redeemedItems) {
+            const res = await axios.get(`/items/${itemId}`);
+            redeemed.push(res.data);
+          }
+        }
+        setSwappedItems(swapped);
+        setRedeemedItems(redeemed);
+        // Gather all pending swap requests for user's items
+        const allRequests = [];
+        itemsRes.data.forEach(item => {
+          if (item.swapRequests && item.swapRequests.length > 0) {
+            item.swapRequests.forEach(req => {
+              if (req.status === 'pending') {
+                allRequests.push({
+                  itemId: item._id,
+                  itemTitle: item.title,
+                  requesterId: req.requester,
+                  status: req.status
+                });
+              }
+            });
+          }
         });
-
-        setOngoingSwaps(
-          swapsRes.data.filter((swap) => swap.status === 'pending')
-        );
-        setCompletedSwaps(
-          swapsRes.data.filter((swap) => swap.status === 'completed')
-        );
+        setSwapRequests(allRequests);
+        // Gather all swap requests made by the user
+        const allMyRequests = [];
+        // Fetch all items (approved only)
+        const allItemsRes = await axios.get('/items');
+        allItemsRes.data.forEach(item => {
+          if (item.swapRequests && item.swapRequests.length > 0) {
+            item.swapRequests.forEach(req => {
+              if (req.requester === profileRes.data._id) {
+                allMyRequests.push({
+                  itemId: item._id,
+                  itemTitle: item.title,
+                  uploader: item.uploader?.name || '',
+                  status: req.status
+                });
+              }
+            });
+          }
+        });
+        setMySwapRequests(allMyRequests);
       } catch (e) {
         setError(e.response?.data?.msg || 'Failed to load dashboard.');
       } finally {
         setLoading(false);
       }
     };
-
     fetchDashboard();
   }, []);
+
+  // Approve/Reject swap request handler
+  const handleSwapResponse = async (itemId, requesterId, action) => {
+    setSwapMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`/items/${itemId}/swap-response`, { requesterId, action }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSwapMessage(`Swap request ${action}ed.`);
+      // Refresh dashboard
+      window.location.reload();
+    } catch (e) {
+      setSwapMessage(e.response?.data?.msg || 'Error processing swap request.');
+    }
+  };
 
   if (loading) {
     return (
@@ -120,7 +175,7 @@ export default function Dashboard() {
                     {item.images?.[0] && (
                       <Card.Img
                         variant="top"
-                        src={`http://localhost:5000/${item.images[0]}`}
+                        src={`http://localhost:8080/${item.images[0]}`}
                         height="200"
                         style={{ objectFit: 'cover' }}
                       />
@@ -156,37 +211,114 @@ export default function Dashboard() {
         </Col>
       </Row>
 
-      {/* Ongoing Swaps */}
+      {/* Swapped Items */}
       <Row className="mb-5">
         <Col md={12}>
-          <h4 className="text-primary mb-3">Ongoing Swaps</h4>
-          {ongoingSwaps.length === 0 ? (
-            <p>You have no ongoing swaps.</p>
+          <h4 className="text-primary mb-3">Swapped Items</h4>
+          {swappedItems.length === 0 ? (
+            <p>You have not swapped any items yet.</p>
+          ) : (
+            <Row>
+              {swappedItems.map((item) => (
+                <Col md={4} key={item._id} className="mb-4">
+                  <Card className="h-100 shadow-sm">
+                    {item.images?.[0] && (
+                      <Card.Img
+                        variant="top"
+                        src={`http://localhost:8080/${item.images[0]}`}
+                        height="200"
+                        style={{ objectFit: 'cover' }}
+                      />
+                    )}
+                    <Card.Body>
+                      <Card.Title>{item.title}</Card.Title>
+                      <Card.Text>
+                        Status: <span className="text-primary">Swapped</span>
+                      </Card.Text>
+                      <Button
+                        as={Link}
+                        to={`/item/${item._id}`}
+                        variant="outline-primary"
+                        size="sm"
+                      >
+                        View Details
+                      </Button>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          )}
+        </Col>
+      </Row>
+
+      {/* Redeemed Items */}
+      <Row className="mb-5">
+        <Col md={12}>
+          <h4 className="text-warning mb-3">Redeemed Items</h4>
+          {redeemedItems.length === 0 ? (
+            <p>You have not redeemed any items yet.</p>
+          ) : (
+            <Row>
+              {redeemedItems.map((item) => (
+                <Col md={4} key={item._id} className="mb-4">
+                  <Card className="h-100 shadow-sm">
+                    {item.images?.[0] && (
+                      <Card.Img
+                        variant="top"
+                        src={`http://localhost:8080/${item.images[0]}`}
+                        height="200"
+                        style={{ objectFit: 'cover' }}
+                      />
+                    )}
+                    <Card.Body>
+                      <Card.Title>{item.title}</Card.Title>
+                      <Card.Text>
+                        Status: <span className="text-warning">Redeemed</span>
+                      </Card.Text>
+                      <Button
+                        as={Link}
+                        to={`/item/${item._id}`}
+                        variant="outline-warning"
+                        size="sm"
+                      >
+                        View Details
+                      </Button>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          )}
+        </Col>
+      </Row>
+
+      {/* Pending Swap Requests for Your Items */}
+      <Row className="mb-5">
+        <Col md={12}>
+          <h4 className="text-info mb-3">Pending Swap Requests for Your Items</h4>
+          {swapMessage && <Alert variant="info">{swapMessage}</Alert>}
+          {swapRequests.length === 0 ? (
+            <p>No pending swap requests for your items.</p>
           ) : (
             <Table striped bordered hover>
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th>With User</th>
+                  <th>Requester ID</th>
                   <th>Status</th>
-                  <th>View</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {ongoingSwaps.map((swap) => (
-                  <tr key={swap._id}>
-                    <td>{swap.itemTitle}</td>
-                    <td>{swap.otherUserName}</td>
-                    <td className="text-warning">{swap.status}</td>
+                {swapRequests.map((req, idx) => (
+                  <tr key={idx}>
+                    <td>{req.itemTitle}</td>
+                    <td>{req.requesterId}</td>
+                    <td>{req.status}</td>
                     <td>
-                      <Button
-                        as={Link}
-                        to={`/swap/${swap._id}`}
-                        variant="outline-primary"
-                        size="sm"
-                      >
-                        Details
-                      </Button>
+                      <Button variant="success" size="sm" className="me-2" onClick={() => handleSwapResponse(req.itemId, req.requesterId, 'approve')}>Approve</Button>
+                      <Button variant="danger" size="sm" onClick={() => handleSwapResponse(req.itemId, req.requesterId, 'reject')}>Reject</Button>
                     </td>
                   </tr>
                 ))}
@@ -196,38 +328,27 @@ export default function Dashboard() {
         </Col>
       </Row>
 
-      {/* Completed Swaps */}
-      <Row>
+      {/* My Swap Requests */}
+      <Row className="mb-5">
         <Col md={12}>
-          <h4 className="text-secondary mb-3">Completed Swaps</h4>
-          {completedSwaps.length === 0 ? (
-            <p>You have no completed swaps yet.</p>
+          <h4 className="text-info mb-3">My Swap Requests</h4>
+          {mySwapRequests.length === 0 ? (
+            <p>You have not requested any swaps yet.</p>
           ) : (
             <Table striped bordered hover>
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th>With User</th>
+                  <th>Uploader</th>
                   <th>Status</th>
-                  <th>View</th>
                 </tr>
               </thead>
               <tbody>
-                {completedSwaps.map((swap) => (
-                  <tr key={swap._id}>
-                    <td>{swap.itemTitle}</td>
-                    <td>{swap.otherUserName}</td>
-                    <td className="text-success">{swap.status}</td>
-                    <td>
-                      <Button
-                        as={Link}
-                        to={`/swap/${swap._id}`}
-                        variant="outline-secondary"
-                        size="sm"
-                      >
-                        Details
-                      </Button>
-                    </td>
+                {mySwapRequests.map((req, idx) => (
+                  <tr key={idx}>
+                    <td>{req.itemTitle}</td>
+                    <td>{req.uploader}</td>
+                    <td>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</td>
                   </tr>
                 ))}
               </tbody>

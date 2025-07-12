@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from '../api/axios';
 import { useParams } from 'react-router-dom';
-import { Container, Carousel, Button, Alert } from 'react-bootstrap';
+import { Container, Carousel, Button, Alert, Card } from 'react-bootstrap';
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -87,6 +87,12 @@ export default function ItemDetail() {
 
       {error && <Alert variant="danger">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
+
+      <Card.Text>
+        <strong>Redeem via Points:</strong> 15 points<br />
+        <strong>Uploader earns:</strong> 15 points if redeemed, 5 points if swapped<br />
+        <strong>Estimated value:</strong> 10–15 points
+      </Card.Text>
 
       <p><strong>Description:</strong> {item.description}</p>
       <p><strong>Category:</strong> {item.category}</p>
