@@ -9,8 +9,12 @@ const itemSchema = new mongoose.Schema({
   condition: String,
   tags: [String],
   images: [String],
-  status: { type: String, enum: ['available', 'swapped'], default: 'available' },
+  status: { type: String, enum: ['available', 'swapped', 'redeemed'], default: 'available' },
   uploader: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  swapRequest: {
+    requester: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: null }
+  }
 });
 
-module.exports = mongoose.model('Item', itemSchema);
+module.exports = mongoose.models.Item || mongoose.model('Item', itemSchema);
