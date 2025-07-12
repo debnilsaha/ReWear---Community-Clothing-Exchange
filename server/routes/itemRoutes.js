@@ -20,6 +20,16 @@ const authMiddleware = (req, res, next) => {
   });
 };
 
+// ✅ Important: define /mine FIRST
+router.get('/mine', authMiddleware, async (req, res) => {
+  try {
+    const items = await Item.find({ uploader: req.user.id });
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ msg: e.message });
+  }
+});
+
 // Add new item
 router.post('/', authMiddleware, upload.array('images'), async (req, res) => {
   try {
@@ -37,11 +47,23 @@ router.post('/', authMiddleware, upload.array('images'), async (req, res) => {
 
 // Get all items
 router.get('/', async (req, res) => {
-  const items = await Item.find().populate('uploader', 'name');
-  res.json(items);
+  try {
+    const query = {};
+
+    if (req.query.category) query.category = req.query.category;
+    if (req.query.size) query.size = req.query.size;
+    if (req.query.type) query.type = req.query.type;
+    if (req.query.condition) query.condition = req.query.condition;
+    if (req.query.tags) query.tags = { $in: req.query.tags.split(',') };
+
+    const items = await Item.find(query).populate('uploader', 'name');
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ msg: e.message });
+  }
 });
 
-// Get single item
+// ✅ define this last so it doesn't catch 'mine'
 router.get('/:id', async (req, res) => {
   const item = await Item.findById(req.params.id).populate('uploader', 'name');
   res.json(item);

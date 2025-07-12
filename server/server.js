@@ -6,6 +6,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
 const itemRoutes = require('./routes/itemRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const swapRoutes = require('./routes/swapRoutes');
 
 const app = express();
 app.use(cors({
@@ -18,6 +19,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/swaps', swapRoutes);
 
 mongoose
   .connect('mongodb://localhost:27017/rewear', {
